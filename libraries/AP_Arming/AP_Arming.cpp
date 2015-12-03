@@ -17,7 +17,9 @@
 #include "AP_Arming.h"
 #include <AP_Notify/AP_Notify.h>
 #include <GCS_MAVLink/GCS.h>
-
+#if OBC_FAILSAFE == ENABLED
+#include <APM_OBC/APM_OBC.h>
+#endif // OBC_FAILSAFE == ENABLED
 extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo AP_Arming::var_info[] PROGMEM = {
@@ -31,7 +33,7 @@ const AP_Param::GroupInfo AP_Arming::var_info[] PROGMEM = {
     // @Param: CHECK
     // @DisplayName: Arm Checks to Peform (bitmask)
     // @Description: Checks prior to arming motor. This is a bitmask of checks that will be performed befor allowing arming. The default is no checks, allowing arming at any time. You can select whatever checks you prefer by adding together the values of each check type to set this parameter. For example, to only allow arming when you have GPS lock and no RC failsafe you would set ARMING_CHECK to 72. For most users it is recommended that you set this to 1 to enable all checks.
-    // @Values: 0:None,1:All,2:Barometer,4:Compass,8:GPS,16:INS,32:Parameters,64:RC Failsafe,128:Board voltage,256:Battery Level,512:Airspeed,1024:LoggingAvailable
+    // @Values: 0:None,1:All,2:Barometer,4:Compass,8:GPS,16:INS,32:Parameters,64:RC Failsafe,128:Board voltage,256:Battery Level,512:Airspeed,1024:LoggingAvailable, 2024: External Failsafe Board active
     // @User: Advanced
     AP_GROUPINFO("CHECK",        2,     AP_Arming,  checks_to_perform,       ARMING_CHECK_ALL),
 
@@ -41,7 +43,7 @@ const AP_Param::GroupInfo AP_Arming::var_info[] PROGMEM = {
 //The function point is particularly hacky, hacky, tacky
 //but I don't want to reimplement messaging to GCS at the moment:
 AP_Arming::AP_Arming(const AP_AHRS &ahrs_ref, const AP_Baro &baro, Compass &compass,
-                     const enum HomeState &home_set)
+                     const enum HomeState &home_set, const APM_OBC &obc)
     : armed(false)
    , logging_available(false)
    , arming_method(NONE)
@@ -49,6 +51,7 @@ AP_Arming::AP_Arming(const AP_AHRS &ahrs_ref, const AP_Baro &baro, Compass &comp
    , barometer(baro)
    , _compass(compass)
    , home_is_set(home_set)
+   , _obc(obc)
 {
     AP_Param::setup_object_defaults(this, var_info);
     memset(last_accel_pass_ms, 0, sizeof(last_accel_pass_ms));
@@ -351,6 +354,21 @@ bool AP_Arming::manual_transmitter_checks(bool report)
 
     return true;
 }
+#if OBC_FAILSAFE == ENABLED
+bool AP_Arming::externalFS_check(bool report)
+{
+    if ((checks_to_perform & ARMING_CHECK_ALL) ||
+        (checks_to_perform & ARMING_CHECK_FS_BOARD)) {
+        if (!_obc.check_external_failsafe_active()) {
+            if (report) {
+                GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("PreArm: External Board not available"));
+            }
+            return false;
+        }
+    }
+    return true;
+}
+#endif //OBC_FAILAFE == ENABLED
 
 bool AP_Arming::pre_arm_checks(bool report) 
 {
@@ -369,6 +387,10 @@ bool AP_Arming::pre_arm_checks(bool report)
     ret &= battery_checks(report);
     ret &= logging_checks(report);
     ret &= manual_transmitter_checks(report);
+#if OBC_FAILAFE == ENABLED
+    ret &= externalFS_check(report);
+#endif //OBC_FAILAFE == ENABLED
+
 
     return ret;
 }

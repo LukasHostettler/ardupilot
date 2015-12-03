@@ -30,15 +30,15 @@ extern const AP_HAL::HAL& hal;
 
 // table of user settable parameters
 const AP_Param::GroupInfo APM_OBC::var_info[] PROGMEM = {
-    // @Param: MAN_PIN
-    // @DisplayName: Manual Pin
-    // @Description: This sets a digital output pin to set high when in manual mode
+    // @Param: ARM_PIN
+    // @DisplayName: Arm Pin
+    // @Description: This sets a digital input pin to prevent arming if input is low
     // @User: Advanced
-    AP_GROUPINFO("MAN_PIN",     0, APM_OBC, _manual_pin,    -1),
+    AP_GROUPINFO("ARM_PIN",     0, APM_OBC, _ext_fs_armed_pin,    -1),
 
     // @Param: HB_PIN
     // @DisplayName: Heartbeat Pin
-    // @Description: This sets a digital output pin which is cycled at 10Hz when termination is not activated. Note that if a FS_TERM_PIN is set then the heartbeat pin will continue to cycle at 10Hz when termination is activated, to allow the termination board to distinguish between autopilot crash and termination.
+    // @Description: This sets a digital output pin which is cycled at xx 10Hz when termination is not activated. Note that if a FS_TERM_PIN is set then the heartbeat pin will continue to cycle at 10Hz when termination is activated, to allow the termination board to distinguish between autopilot crash and termination.
     // @User: Advanced
     AP_GROUPINFO("HB_PIN",      1, APM_OBC, _heartbeat_pin, -1),
 
@@ -117,6 +117,26 @@ const AP_Param::GroupInfo APM_OBC::var_info[] PROGMEM = {
     // @User: Advanced
     AP_GROUPINFO("MAX_COM_LOSS", 14, APM_OBC, _max_comms_loss, 0),
 
+    // @Param: RC_DEPLOY_CHAN
+    // @DisplayName: RC-channel from which the deployement is commanded (0 desactivates)
+    // @Description: Number of input-channel which can terminate flight
+    // @User: Advanced
+    AP_GROUPINFO("RC_DEPLOY_CHAN", 15, APM_OBC, _rc_deploy_chan, 0),
+
+    // @Param: CHUTE_MIN_PWM
+    // @DisplayName: minimal pwm value for RC-Flight termination
+    // @Description: the minimal pwm value at which the rc input on RC_DEPLOY_CHAN is considered to stop heartbeat
+    // @Range: 925 2075
+    // @User: Advanced
+    AP_GROUPINFO("CHUTE_MIN_PWM", 16, APM_OBC, _chute_min_pwm, 0),
+
+    // @Param: CHUTE_MIN_PWM
+    // @DisplayName: maximal pwm value for RC-Flight termination
+    // @Description: the maximal pwm value at which the rc input on RC_DEPLOY_CHAN is considered to stop heartbeat
+    // @Range: 925 2075
+    // @User: Advanced
+    AP_GROUPINFO("CHUTE_MAX_PWM", 17, APM_OBC, _chute_max_pwm, 0),
+
     AP_GROUPEND
 };
 
@@ -143,17 +163,19 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
         (hal.scheduler->millis() - last_valid_rc_ms) > (unsigned)_rc_fail_time.get()) {
         if (!_terminate) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("RC failure terminate"));
+            _terminate.set(1); //TODO: change to RTL
+        }
+    }
+
+    // check for RC-deploy
+    if(_rc_deploy_chan && !_terminate){
+        uint16_t actual_pwm=hal.rcin->read(_rc_deploy_chan-1);
+        if(actual_pwm>= _chute_min_pwm && actual_pwm<= _chute_max_pwm ){
+            GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("RC terminate"));
             _terminate.set(1);
         }
     }
     
-    // tell the failsafe board if we are in manual control
-    // mode. This tells it to pass through controls from the
-    // receiver
-    if (_manual_pin != -1) {
-        hal.gpio->pinMode(_manual_pin, HAL_GPIO_OUTPUT);
-        hal.gpio->write(_manual_pin, mode==OBC_MANUAL);
-    }
 
     uint32_t now = hal.scheduler->millis();
     bool gcs_link_ok = ((now - last_heartbeat_ms) < 10000);
@@ -315,7 +337,8 @@ APM_OBC::check_altlimit(void)
 /*
   setup the IO boards failsafe values for if the FMU firmware crashes
  */
-void APM_OBC::setup_failsafe(void)
+void
+APM_OBC::setup_failsafe(void)
 {
     if (!_enable) {
         return;
@@ -343,7 +366,7 @@ void APM_OBC::setup_failsafe(void)
 }
 
 /*
-  setu radio_out values for all channels to termination values if we
+  setup radio_out values for all channels to termination values if we
   are terminating
  */
 void APM_OBC::check_crash_plane(void)
@@ -384,4 +407,17 @@ void APM_OBC::check_crash_plane(void)
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_elevator_with_input, RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_manual, RC_Channel::RC_CHANNEL_LIMIT_TRIM);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_none, RC_Channel::RC_CHANNEL_LIMIT_TRIM);
+}
+
+// Checks if failsafe sends appropriate signal
+bool
+APM_OBC::check_external_failsafe_active(void) const{
+    if(_ext_fs_armed_pin!=-1){
+        hal.gpio->pinMode(_ext_fs_armed_pin,0); //set as input
+        //GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("Pin %d, Voltage: %d"), _ext_fs_armed_pin,hal.gpio->read(_ext_fs_armed_pin));
+        return hal.gpio->read(_ext_fs_armed_pin); //return result
+    }
+
+
+    return true;
 }

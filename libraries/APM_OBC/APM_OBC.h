@@ -74,6 +74,8 @@ public:
     // called in servo output code to set servos to crash position if needed
     void check_crash_plane(void);
 
+    bool check_external_failsafe_active() const ;
+
     // for holding parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -88,7 +90,7 @@ private:
     AP_Int8 _enable;
     // digital output pins for communicating with the failsafe board
     AP_Int8 _heartbeat_pin;
-    AP_Int8 _manual_pin;
+    AP_Int8 _ext_fs_armed_pin;
     AP_Int8 _terminate_pin;
     AP_Int8 _terminate;
     AP_Int8 _terminate_action;
@@ -103,6 +105,10 @@ private:
     AP_Int16 _rc_fail_time;
     AP_Int8  _max_gps_loss;
     AP_Int8  _max_comms_loss;
+    AP_Int8 _rc_deploy_chan;
+
+    AP_Int16 _chute_min_pwm;
+    AP_Int16 _chute_max_pwm;
 
     bool _heartbeat_pin_value;
 

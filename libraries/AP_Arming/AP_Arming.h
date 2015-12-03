@@ -7,6 +7,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
+#include <APM_OBC/APM_OBC.h>
 
 class AP_Arming {
 public:
@@ -23,6 +24,9 @@ public:
         ARMING_CHECK_BATTERY    = 0x0100,
         ARMING_CHECK_AIRSPEED   = 0x0200,
         ARMING_CHECK_LOGGING    = 0x0400,
+#if OBC_FAILSAFE == ENABLED
+        ARMING_CHECK_FS_BOARD   = 0x0800,
+#endif
     };
 
     enum ArmingMethod {
@@ -44,7 +48,7 @@ public:
     };
 
     AP_Arming(const AP_AHRS &ahrs_ref, const AP_Baro &baro, Compass &compass,
-              const enum HomeState &home_set);
+              const enum HomeState &home_set, const APM_OBC &obc);
 
     ArmingRequired arming_required();
     bool arm(uint8_t method);
@@ -81,6 +85,7 @@ protected:
     const AP_Baro                                  &barometer;
     Compass                                         &_compass;
     const enum HomeState                         &home_is_set;
+    const APM_OBC                                       &_obc;
     uint32_t                                  last_accel_pass_ms[INS_MAX_INSTANCES];
     uint32_t                                  last_gyro_pass_ms[INS_MAX_INSTANCES];
 
@@ -103,6 +108,9 @@ protected:
     bool hardware_safety_check(bool report);
 
     bool manual_transmitter_checks(bool report);
+#if OBC_FAILSAFE == ENABLED
+    bool externalFS_check(bool report);
+#endif// OBC_FAILSAFE == ENABLED
 };
 
 #endif //__AP_ARMING_H__
