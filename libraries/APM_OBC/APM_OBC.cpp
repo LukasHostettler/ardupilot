@@ -117,27 +117,30 @@ const AP_Param::GroupInfo APM_OBC::var_info[] PROGMEM = {
     // @User: Advanced
     AP_GROUPINFO("MAX_COM_LOSS", 14, APM_OBC, _max_comms_loss, 0),
 
-    // @Param: RC_DEPLOY_CHAN
+
+    // @Param: RC_TERM_CHAN
     // @DisplayName: RC-channel from which the deployement is commanded (0 desactivates)
     // @Description: Number of input-channel which can terminate flight
     // @User: Advanced
-    AP_GROUPINFO("RC_DEPLOY_CHAN", 15, APM_OBC, _rc_deploy_chan, 0),
+    AP_GROUPINFO("RC_TERM_CHAN", 15, APM_OBC, _rc_deploy_chan, 0),
 
-    // @Param: CHUTE_MIN_PWM
+    // @Param: TERM_MIN_PWM
     // @DisplayName: minimal pwm value for RC-Flight termination
     // @Description: the minimal pwm value at which the rc input on RC_DEPLOY_CHAN is considered to stop heartbeat
     // @Range: 925 2075
     // @User: Advanced
-    AP_GROUPINFO("CHUTE_MIN_PWM", 16, APM_OBC, _chute_min_pwm, 0),
+    AP_GROUPINFO("TERM_MIN_PWM", 16, APM_OBC, _chute_min_pwm, 0),
 
-    // @Param: CHUTE_MIN_PWM
+    // @Param: TERM_MAX_PWM
     // @DisplayName: maximal pwm value for RC-Flight termination
     // @Description: the maximal pwm value at which the rc input on RC_DEPLOY_CHAN is considered to stop heartbeat
     // @Range: 925 2075
     // @User: Advanced
-    AP_GROUPINFO("CHUTE_MAX_PWM", 17, APM_OBC, _chute_max_pwm, 0),
+    AP_GROUPINFO("TERM_MAX_PWM", 17, APM_OBC, _chute_max_pwm, 0),
 
     AP_GROUPEND
+
+
 };
 
 // check for Failsafe conditions. This is called at 10Hz by the main
@@ -175,7 +178,7 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
             _terminate.set(1);
         }
     }
-    
+
 
     uint32_t now = hal.scheduler->millis();
     bool gcs_link_ok = ((now - last_heartbeat_ms) < 10000);

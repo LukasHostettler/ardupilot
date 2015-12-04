@@ -53,7 +53,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] PROGMEM = {
     SCHED_TASK(read_airspeed,           5,   1200),
     SCHED_TASK(update_alt,              5,   3400),
     SCHED_TASK(adjust_altitude_target,  5,   1000),
-    SCHED_TASK(obc_fs_check,            1,   1000), //Todo change freq. (orig =5)
+    SCHED_TASK(obc_fs_check,            1,   1000), //Todo change freq. (orig =5,1000)
     SCHED_TASK(gcs_update,              1,   1700),
     SCHED_TASK(gcs_data_stream_send,    1,   3000),
     SCHED_TASK(update_events,           1,   1500),
