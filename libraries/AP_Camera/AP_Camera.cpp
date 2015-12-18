@@ -5,6 +5,7 @@
 #include <AP_Math/AP_Math.h>
 #include <RC_Channel/RC_Channel.h>
 #include <AP_HAL/AP_HAL.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 
 // ------------------------------
 #define CAM_DEBUG DISABLED
@@ -108,7 +109,7 @@ AP_Camera::trigger_pic(bool send_mavlink_msg)
         cmd_msg.param5 = 1;
         // create message
         mavlink_message_t msg;
-        mavlink_msg_command_long_encode(0, 0, &msg, &cmd_msg);
+        mavlink_msg_command_long_encode(0, MAV_COMP_ID_CAMERA , &msg, &cmd_msg);
 
         // forward to all components
         GCS_MAVLINK::send_to_components(&msg);

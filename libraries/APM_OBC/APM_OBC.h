@@ -46,7 +46,7 @@ public:
         STATE_DATA_LINK_LOSS  = 2,
         STATE_GPS_LOSS        = 3
     };
-
+    bool rtl;
     // Constructor
     APM_OBC(AP_Mission &_mission, AP_Baro &_baro, const AP_GPS &_gps, const RCMapper &_rcmap) :
         mission(_mission),
@@ -60,7 +60,7 @@ public:
             
             _state = STATE_PREFLIGHT;
             _terminate.set(0);
-            
+            rtl = 0;
             _saved_wp = 0;
         }
 
@@ -120,6 +120,7 @@ private:
 
     // number of times we've lost data link
     uint8_t _comms_loss_count;
+
 
     // last comms loss time
     uint32_t _last_comms_loss_ms;

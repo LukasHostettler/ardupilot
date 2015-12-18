@@ -143,7 +143,7 @@ const AP_Param::GroupInfo APM_OBC::var_info[] PROGMEM = {
 
 };
 
-// check for Failsafe conditions. This is called at 10Hz by the main
+// check for Failsafe conditions. This is called at xxHz by the main
 // ArduPlane code
 void
 APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geofence_breached, uint32_t last_valid_rc_ms)
@@ -166,7 +166,8 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
         (hal.scheduler->millis() - last_valid_rc_ms) > (unsigned)_rc_fail_time.get()) {
         if (!_terminate) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("RC failure terminate"));
-            _terminate.set(1); //TODO: change to RTL
+            rtl=1;
+            //_terminate.set(1); //TODO: change to RTL
         }
     }
 
@@ -199,9 +200,10 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
         if (!gcs_link_ok) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("State DATA_LINK_LOSS"));
             _state = STATE_DATA_LINK_LOSS;
-            if (_wp_comms_hold) {
+            if (_wp_comms_hold>0) {
                 _saved_wp = mission.get_current_nav_cmd().index;
                 mission.set_current_cmd(_wp_comms_hold);
+                       
             }
             // if two events happen within 30s we consider it to be part of the same event
             if (now - _last_comms_loss_ms > 30*1000UL) {
@@ -238,12 +240,16 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
             _state = STATE_AUTO;
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, PSTR("GCS OK"));
             // we only return to the mission if we have not exceeded AFS_MAX_COM_LOSS
-            if (_saved_wp != 0 && 
+            if (_saved_wp != 0 &&
                 (_max_comms_loss <= 0 || 
                  _comms_loss_count <= _max_comms_loss)) {
                 mission.set_current_cmd(_saved_wp);            
                 _saved_wp = 0;
             }
+            //we reset the RTL demand
+            rtl=0;
+        }else if(now-_last_comms_loss_ms > 20*1000L){ //long event
+            rtl=1;
         }
         break;
 
@@ -265,8 +271,14 @@ APM_OBC::check(APM_OBC::control_mode mode, uint32_t last_heartbeat_ms, bool geof
                 mission.set_current_cmd(_saved_wp);            
                 _saved_wp = 0;
             }
+            //Reset the rtl demand
+            rtl=0;
+        } else if(now-_last_gps_loss_ms > 20*1000L){ //long event
+            rtl=1;
         }
         break;
+        
+        //Add cases for Barometer loss , Fence failure, ...battery
     }
 
     // if we are not terminating or if there is a separate terminate
@@ -357,6 +369,7 @@ APM_OBC::setup_failsafe(void)
     hal.rcout->set_failsafe_pwm(1U<<(rcmap.yaw()-1),      ch_yaw->get_limit_pwm(RC_Channel::RC_CHANNEL_LIMIT_MAX));
     hal.rcout->set_failsafe_pwm(1U<<(rcmap.throttle()-1), ch_throttle->get_limit_pwm(RC_Channel::RC_CHANNEL_LIMIT_MIN));
 
+
     // and all aux channels
     RC_Channel_aux::set_servo_failsafe(RC_Channel_aux::k_flap_auto, RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_failsafe(RC_Channel_aux::k_flap, RC_Channel::RC_CHANNEL_LIMIT_MAX);
@@ -404,7 +417,8 @@ void APM_OBC::check_crash_plane(void)
     // and all aux channels
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_flap_auto, RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_flap, RC_Channel::RC_CHANNEL_LIMIT_MAX);
-    RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_aileron, RC_Channel::RC_CHANNEL_LIMIT_MIN);
+    RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_aileron, RC_Channel::RC_CHANNEL_LIMIT_MAX);
+    RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_aileron_with_input,RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_rudder, RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_elevator, RC_Channel::RC_CHANNEL_LIMIT_MAX);
     RC_Channel_aux::set_servo_limit(RC_Channel_aux::k_elevator_with_input, RC_Channel::RC_CHANNEL_LIMIT_MAX);
