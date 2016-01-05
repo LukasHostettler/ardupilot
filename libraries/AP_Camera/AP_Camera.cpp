@@ -101,19 +101,35 @@ AP_Camera::trigger_pic(bool send_mavlink_msg)
         break;
     }
 
-    if (send_mavlink_msg) {
-        // create command long mavlink message
-        mavlink_command_long_t cmd_msg;
-        memset(&cmd_msg, 0, sizeof(cmd_msg));
-        cmd_msg.command = MAV_CMD_DO_DIGICAM_CONTROL;
-        cmd_msg.param5 = 1;
-        // create message
-        mavlink_message_t msg;
-        mavlink_msg_command_long_encode(0, MAV_COMP_ID_CAMERA , &msg, &cmd_msg);
 
+    // create command long mavlink message
+    mavlink_command_long_t cmd_msg;
+    memset(&cmd_msg, 0, sizeof(cmd_msg));
+    cmd_msg.command = MAV_CMD_DO_DIGICAM_CONTROL;
+    cmd_msg.param5 = 1;
+    // create message
+    mavlink_message_t msg;
+    if (send_mavlink_msg) {
+        mavlink_msg_command_long_encode(0, 0 , &msg, &cmd_msg);
         // forward to all components
         GCS_MAVLINK::send_to_components(&msg);
     }
+
+    //mavlink_msg_command_long_encode(0, MAV_COMP_ID_CAMERA , &msg, &cmd_msg);
+    // forward to CAMERA COMPONENT
+    // send command_long command containing a DO_DIGICAM_CONTROL command
+   /* mavlink_msg_command_long_send(MAVLINK_COMM_2, //Telemetry 2
+                                  MAV_COMP_ID_CAMERA,
+                                  MAV_COMP_ID_CAMERA,
+                                  MAV_CMD_DO_DIGICAM_CONTROL,
+                                  0,        // confirmation of zero means this is the first time this message has been sent
+                                  0,
+                                  0,
+                                  0,
+                                  0, 1, 0,  // param4 ~ param6 unused
+                                  0);*/
+    GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, PSTR("Cheese:D"));
+    //GCS_MAVLINK::send_to_components(&msg);
 }
 
 /// de-activate the trigger after some delay, but without using a delay() function
@@ -145,7 +161,7 @@ AP_Camera::control_msg(mavlink_message_t* msg)
 {
     __mavlink_digicam_control_t packet;
     mavlink_msg_digicam_control_decode(msg, &packet);
-
+    GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, PSTR("Via Control-msg"));
     control(packet.session, packet.zoom_pos, packet.zoom_step, packet.focus_lock, packet.shot, packet.command_id);
 }
 
@@ -178,7 +194,7 @@ void AP_Camera::control(float session, float zoom_pos, float zoom_step, float fo
 {
     // take picture
     if (is_equal(shooting_cmd,1.0f)) {
-        trigger_pic(false);
+        trigger_pic(true);
     }
 
     mavlink_message_t msg;
