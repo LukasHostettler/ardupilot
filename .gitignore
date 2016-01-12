@@ -18,6 +18,7 @@
 *.zip
 .*.swo
 .*.swp
+*.user*
 .built
 .context
 .cproject
@@ -91,3 +92,4 @@ status.txt
 tags
 test.ArduCopter/*
 Thumbs.db
+
